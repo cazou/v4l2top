@@ -198,8 +198,10 @@ impl StreamBarRenderer {
 
     pub fn render(&self, frame: &mut Frame, area: ratatui::layout::Rect) {
         let row_constraints: Vec<Constraint> =
-            (0..BAR_ROWS+1).map(|_| Constraint::Length(1)).collect();
-        let col_constraints = (0..BAR_COLS).map(|_| Constraint::Percentage(100 / BAR_COLS as u16)).collect::<Vec<Constraint>>();
+            (0..BAR_ROWS + 1).map(|_| Constraint::Length(1)).collect();
+        let col_constraints = (0..BAR_COLS)
+            .map(|_| Constraint::Percentage(100 / BAR_COLS as u16))
+            .collect::<Vec<Constraint>>();
 
         let rows_layout = Layout::default()
             .direction(Direction::Vertical)
@@ -284,8 +286,15 @@ impl StreamTableRenderer {
         area: ratatui::layout::Rect,
         infos: &HashMap<V4L2Stream, StreamInfo>,
     ) {
-        let columns = ["Driver", "PID", "FD", "Clock rate", "Total Memory", "Command"];
-        let mut widths = (0..columns.len()-1)
+        let columns = [
+            "Driver",
+            "PID",
+            "FD",
+            "Clock rate",
+            "Total Memory",
+            "Command",
+        ];
+        let mut widths = (0..columns.len() - 1)
             .map(|_| Constraint::Percentage(60 / (columns.len() - 1) as u16))
             .collect::<Vec<Constraint>>();
         widths.push(Constraint::Percentage(40));
@@ -659,7 +668,9 @@ impl TopRenderer {
     }
 
     fn read_file_to_string(path: String) -> Result<String> {
-        std::fs::read_to_string(path).map(|s| s.trim().replace("\0", " ").to_string()).map_err(|e| e.into())
+        std::fs::read_to_string(path)
+            .map(|s| s.trim().replace("\0", " ").to_string())
+            .map_err(|e| e.into())
     }
 
     fn update_data(&mut self) -> Result<()> {
@@ -686,8 +697,10 @@ impl TopRenderer {
         for (stream, info) in &infos {
             let stream_info = self.infos.entry(*stream).or_insert(StreamInfo {
                 v4l2_info: info.clone(),
-                comm: Self::read_file_to_string(format!("/proc/{}/comm", stream.pid)).unwrap_or("unknown".to_string()),
-                cmdline: Self::read_file_to_string(format!("/proc/{}/cmdline", stream.pid)).unwrap_or("unknown".to_string()),
+                comm: Self::read_file_to_string(format!("/proc/{}/comm", stream.pid))
+                    .unwrap_or("unknown".to_string()),
+                cmdline: Self::read_file_to_string(format!("/proc/{}/cmdline", stream.pid))
+                    .unwrap_or("unknown".to_string()),
                 usage: CodecUsage {
                     last_read: None,
                     last_value_ns: None,
@@ -729,7 +742,8 @@ impl TopRenderer {
                 self.usage_history.render(frame, chunks[0]);
             }
             UsageRendererType::PerPid => {
-                self.stream_bars.update(&self.infos, self.table_renderer.selected_stream());
+                self.stream_bars
+                    .update(&self.infos, self.table_renderer.selected_stream());
                 self.stream_bars.render(frame, chunks[0]);
             }
         };
