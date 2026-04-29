@@ -28,7 +28,7 @@ fn parse_mem_file(
         if let Some(caps) = line_regex.captures(&line?) {
             let entry = mem
                 .entry(V4L2Stream::new(caps["pid"].parse()?, caps["fd"].parse()?))
-                .or_insert(vec![]);
+                .or_default();
             entry.push(DMABuffer {
                 label: caps["label"].to_string(),
                 size: caps["size"].parse()?,

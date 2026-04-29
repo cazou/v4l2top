@@ -118,10 +118,7 @@ fn find_v4l2_fdinfo_for_pid(pid: usize) -> Result<HashMap<V4L2Stream, V4l2FdInfo
         let timestamp = Instant::now();
         let fields = parse_fdinfo(entry.path())?;
 
-        results.insert(
-            V4L2Stream::new(pid, fd as usize),
-            V4l2FdInfo { fields, timestamp },
-        );
+        results.insert(V4L2Stream::new(pid, fd), V4l2FdInfo { fields, timestamp });
     }
 
     Ok(results)

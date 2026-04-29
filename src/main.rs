@@ -25,28 +25,28 @@ fn app(terminal: &mut DefaultTerminal) -> Result<()> {
     terminal.draw(|frame| renderer.render(frame))?;
 
     loop {
-        if crossterm::event::poll(Duration::from_millis(100))? {
-            if let Some(event) = crossterm::event::read()?.as_key_press_event() {
-                match event.code {
-                    crossterm::event::KeyCode::Char('q') => break Ok(()),
-                    crossterm::event::KeyCode::Char('c') => {
-                        if event.modifiers.contains(KeyModifiers::CONTROL) {
-                            break Ok(());
-                        }
+        if crossterm::event::poll(Duration::from_millis(100))?
+            && let Some(event) = crossterm::event::read()?.as_key_press_event()
+        {
+            match event.code {
+                crossterm::event::KeyCode::Char('q') => break Ok(()),
+                crossterm::event::KeyCode::Char('c') => {
+                    if event.modifiers.contains(KeyModifiers::CONTROL) {
+                        break Ok(());
                     }
-                    crossterm::event::KeyCode::F(2) => {
-                        renderer.shift_usage_renderer();
-                    }
-                    crossterm::event::KeyCode::F(3) => {
-                        renderer.show_bytes_flip();
-                    }
-                    crossterm::event::KeyCode::F(4) => {
-                        renderer.full_cmd_flip();
-                    }
-                    crossterm::event::KeyCode::Up => renderer.select_previous(),
-                    crossterm::event::KeyCode::Down => renderer.select_next(),
-                    _ => {}
                 }
+                crossterm::event::KeyCode::F(2) => {
+                    renderer.shift_usage_renderer();
+                }
+                crossterm::event::KeyCode::F(3) => {
+                    renderer.show_bytes_flip();
+                }
+                crossterm::event::KeyCode::F(4) => {
+                    renderer.full_cmd_flip();
+                }
+                crossterm::event::KeyCode::Up => renderer.select_previous(),
+                crossterm::event::KeyCode::Down => renderer.select_next(),
+                _ => {}
             }
         }
         terminal.draw(|frame| renderer.render(frame))?;

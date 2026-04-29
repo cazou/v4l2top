@@ -4,7 +4,6 @@ use std::{
 };
 
 use anyhow::{Result, bail};
-use crossterm::style::style;
 use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout},
@@ -130,10 +129,10 @@ impl StreamBarRenderer {
 
         // Remove PIDs that are no longer present.
         for slot in self.slots.iter_mut() {
-            if let Some(stream) = *slot {
-                if !info.contains_key(&stream) {
-                    *slot = None;
-                }
+            if let Some(stream) = *slot
+                && !info.contains_key(&stream)
+            {
+                *slot = None;
             }
         }
 
@@ -144,13 +143,7 @@ impl StreamBarRenderer {
         // Sort Streams by usage descending; keep only top NUM_BARS.
         let mut ranked: Vec<(V4L2Stream, u8)> = info
             .iter()
-            .filter_map(|(&p, b)| {
-                if let Some(pct) = b.usage.current_usage {
-                    Some((p, pct))
-                } else {
-                    None
-                }
-            })
+            .filter_map(|(&p, b)| b.usage.current_usage.map(|pct| (p, pct)))
             .collect();
         ranked.sort_by(|a, b| b.1.cmp(&a.1));
         ranked.truncate(NUM_BARS);
@@ -158,10 +151,10 @@ impl StreamBarRenderer {
 
         // Evict Streams that fell out of the max NUM_BARS.
         for slot in self.slots.iter_mut() {
-            if let Some(pid) = *slot {
-                if !top_pids.contains_key(&pid) {
-                    *slot = None;
-                }
+            if let Some(pid) = *slot
+                && !top_pids.contains_key(&pid)
+            {
+                *slot = None;
             }
         }
 
@@ -176,10 +169,10 @@ impl StreamBarRenderer {
             (0..NUM_BARS).filter(|i| self.slots[*i].is_none()).collect();
 
         for &(stream, _) in &ranked {
-            if !assigned.contains_key(&stream) {
-                if let Some(slot_idx) = free_slots.pop_front() {
-                    self.slots[slot_idx] = Some(stream);
-                }
+            if !assigned.contains_key(&stream)
+                && let Some(slot_idx) = free_slots.pop_front()
+            {
+                self.slots[slot_idx] = Some(stream);
             }
         }
 
@@ -537,11 +530,10 @@ impl UsageHistoryRenderer {
         let mut all_streams: HashSet<V4L2Stream> = self
             .snapshots
             .iter()
-            .flat_map(|s| s.per_stream.iter().map(|(&stream, _)| stream.clone()))
-            .into_iter()
+            .flat_map(|s| s.per_stream.iter().map(|(&stream, _)| stream))
             .collect();
         let mut all_streams: Vec<V4L2Stream> = all_streams.drain().collect();
-        all_streams.sort_by(|a, b| a.cmp(b));
+        all_streams.sort();
 
         self.x_max = self.snapshots.back().unwrap().tick as f64;
         // Fixed-width window: always show max_points ticks so data scrolls
@@ -576,10 +568,10 @@ impl UsageHistoryRenderer {
                 }
                 // Extend horizontal line at the previous value up to this tick,
                 // then drop/rise vertically to the new value.
-                if let Some(py) = prev_y {
-                    if (py - cumulative).abs() > f64::EPSILON {
-                        points.push((x, py));
-                    }
+                if let Some(py) = prev_y
+                    && (py - cumulative).abs() > f64::EPSILON
+                {
+                    points.push((x, py));
                 }
                 points.push((x, cumulative));
                 prev_y = Some(cumulative);
@@ -710,7 +702,7 @@ impl TopRenderer {
             });
 
             stream_info.usage.update(info);
-            stream_info.mem_usage = mem_list.get(&stream).unwrap_or(&vec![]).clone();
+            stream_info.mem_usage = mem_list.get(stream).unwrap_or(&vec![]).clone();
         }
 
         Ok(())
