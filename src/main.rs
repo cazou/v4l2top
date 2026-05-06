@@ -44,6 +44,9 @@ fn app(terminal: &mut DefaultTerminal) -> Result<()> {
                 crossterm::event::KeyCode::F(4) => {
                     renderer.full_cmd_flip();
                 }
+                crossterm::event::KeyCode::F(5) => {
+                    renderer.codec_only_flip();
+                }
                 crossterm::event::KeyCode::Up => renderer.select_previous(),
                 crossterm::event::KeyCode::Down => renderer.select_next(),
                 _ => {}

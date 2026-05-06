@@ -646,6 +646,9 @@ pub struct TopRenderer {
     stream_bars: StreamBarRenderer,
     table_renderer: StreamTableRenderer,
     infos: HashMap<V4L2Stream, StreamInfo>,
+    /// When true, only rows whose fdinfo carries a `media-engine-*` key
+    /// are displayed.
+    codec_only: bool,
 }
 
 impl TopRenderer {
@@ -656,6 +659,7 @@ impl TopRenderer {
             stream_bars: StreamBarRenderer::new(),
             table_renderer: StreamTableRenderer::new(),
             infos: HashMap::new(),
+            codec_only: false,
         }
     }
 
@@ -663,6 +667,17 @@ impl TopRenderer {
         std::fs::read_to_string(path)
             .map(|s| s.trim().replace("\0", " ").to_string())
             .map_err(|e| e.into())
+    }
+
+    /// Returns true if the FD should appear in the UI given the current
+    /// filter settings. When `codec_only` is on, only FDs whose driver
+    /// emits at least one `media-engine-*` key (the V4L2 fdinfo spec key
+    /// for engine utilization, e.g. `media-engine-decoder`) are kept.
+    fn passes_filter(&self, info: &V4l2FdInfo) -> bool {
+        if !self.codec_only {
+            return true;
+        }
+        info.fields.keys().any(|k| k.starts_with("media-engine-"))
     }
 
     fn update_data(&mut self) -> Result<()> {
@@ -675,11 +690,14 @@ impl TopRenderer {
 
         let mem_list = v4l2_mem_get_usage()?;
 
-        // Remove entries for closed FDs and update usage for active ones.
+        // Remove entries for closed FDs and ones the current filter rejects.
         let to_remove = self
             .infos
             .keys()
-            .filter(|stream| !infos.keys().any(|info| info == *stream))
+            .filter(|stream| match infos.get(stream) {
+                None => true,
+                Some(info) => !self.passes_filter(info),
+            })
             .cloned()
             .collect::<Vec<_>>();
         for stream in to_remove {
@@ -687,6 +705,9 @@ impl TopRenderer {
         }
 
         for (stream, info) in &infos {
+            if !self.passes_filter(info) {
+                continue;
+            }
             let stream_info = self.infos.entry(*stream).or_insert(StreamInfo {
                 v4l2_info: info.clone(),
                 comm: Self::read_file_to_string(format!("/proc/{}/comm", stream.pid))
@@ -749,6 +770,11 @@ impl TopRenderer {
             .render_mem_details(frame, layout_right, &self.infos);
 
         // Render shortcuts
+        let codec_only_label = if self.codec_only {
+            "CodecOnly[on]"
+        } else {
+            "CodecOnly[off]"
+        };
         let line = Line::default().spans([
             "F2".bold(),
             "UsageType".black().on_light_green(),
@@ -756,6 +782,8 @@ impl TopRenderer {
             "Pretty/Byte".black().on_light_green(),
             "F4".bold(),
             "FullCmd".black().on_light_green(),
+            "F5".bold(),
+            codec_only_label.black().on_light_green(),
             "q".bold(),
             "Quit".black().on_light_green(),
         ]);
@@ -773,6 +801,10 @@ impl TopRenderer {
 
     pub fn full_cmd_flip(&mut self) {
         self.table_renderer.full_cmd = !self.table_renderer.full_cmd;
+    }
+
+    pub fn codec_only_flip(&mut self) {
+        self.codec_only = !self.codec_only;
     }
 
     pub fn select_previous(&mut self) {
