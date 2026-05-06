@@ -91,6 +91,27 @@ fn is_v4l2_fd(fd_dir: &Path, fd_name: &str) -> bool {
         .unwrap_or(false)
 }
 
+/// Recover the V4L2 driver name from sysfs for a foreign process's FD.
+///
+/// fdinfo only carries `media-driver` when the kernel driver implements
+/// `show_fdinfo` (not present on most other V4L2 drivers like mms platform
+/// scalers). Falling back to `/sys/class/video4linux/<dev>/device/driver`
+/// gives us the bus driver name for *any* registered V4L2 node, without
+/// opening it.
+fn driver_name_from_sysfs(fd_dir: &Path, fd_name: &str) -> Option<String> {
+    // /proc/<pid>/fd/<fd> -> /dev/videoN
+    let dev_path = fs::read_link(fd_dir.join(fd_name)).ok()?;
+    let dev_name = dev_path.file_name()?.to_str()?;
+
+    // /sys/class/video4linux/videoN/device/driver -> .../bus/<bus>/drivers/<driver>
+    let sys_driver = format!("/sys/class/video4linux/{}/device/driver", dev_name);
+    let driver_link = fs::read_link(&sys_driver).ok()?;
+    driver_link
+        .file_name()?
+        .to_str()
+        .map(|s| s.to_string())
+}
+
 /// Find all V4L2 fdinfo entries for a single process.
 fn find_v4l2_fdinfo_for_pid(pid: usize) -> Result<HashMap<V4L2Stream, V4l2FdInfo>> {
     let pid_dir = PathBuf::from(format!("/proc/{pid}"));
@@ -116,7 +137,16 @@ fn find_v4l2_fdinfo_for_pid(pid: usize) -> Result<HashMap<V4L2Stream, V4l2FdInfo
         let fd: usize = fd_name_str.parse()?;
 
         let timestamp = Instant::now();
-        let fields = parse_fdinfo(entry.path())?;
+        let mut fields = parse_fdinfo(entry.path())?;
+
+        // If the kernel driver did not emit `media-driver` (i.e. it has no
+        // show_fdinfo callback), recover the driver name from sysfs so the
+        // row identifies itself instead of rendering as "unknown".
+        if !fields.contains_key("media-driver") {
+            if let Some(name) = driver_name_from_sysfs(&fd_dir, &fd_name_str) {
+                fields.insert("media-driver".to_string(), name);
+            }
+        }
 
         results.insert(V4L2Stream::new(pid, fd), V4l2FdInfo { fields, timestamp });
     }
