@@ -12,9 +12,11 @@ use ratatui::DefaultTerminal;
 use cli_log::*;
 
 use renderers::TopRenderer;
+use crate::v4l2_stats::{V4L2Stream, V4l2FdInfo, find_all_v4l2_fdinfo};
 
 fn main() -> Result<()> {
     cli_log::init_cli_log!();
+    //println!("{:?}", find_all_v4l2_fdinfo(None));
     ratatui::run(app)?;
     Ok(())
 }

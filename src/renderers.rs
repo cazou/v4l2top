@@ -306,13 +306,7 @@ impl StreamTableRenderer {
             .map(|stream| {
                 let info = infos.get(stream).unwrap();
                 Row::new([
-                    Cell::from(
-                        info.v4l2_info
-                            .fields
-                            .get("media-driver")
-                            .unwrap_or(&"unknown".to_string())
-                            .to_string(),
-                    ),
+                    Cell::from(info.v4l2_info.driver.clone()),
                     Cell::from(stream.pid.to_string()),
                     Cell::from(stream.fd.to_string()),
                     Cell::from(
