@@ -70,12 +70,19 @@ impl CodecUsage {
         if let (Some(last_read), Some(last_value_ns), Some(value_ns)) =
             (self.last_read, self.last_value_ns, value_ns)
         {
+            if value_ns < last_value_ns {
+                // Counter reset (e.g. due to FD reuse by the same PID): discard history.
+                self.last_read = Some(info.timestamp);
+                self.last_value_ns = Some(value_ns);
+                self.current_usage = None;
+                return;
+            }
+
             let elapsed = last_read.elapsed().as_secs_f64();
             if elapsed > 0.0 {
                 let usage =
                     ((value_ns - last_value_ns) as f64 / (elapsed * 1_000_000_000.0)) * 100.0;
                 self.current_usage = Some(usage.min(100.0) as u8);
-                return;
             }
         }
 
