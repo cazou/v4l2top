@@ -84,7 +84,7 @@ impl CodecUsage {
     fn update(&mut self, info: &V4l2FdInfo) {
         let value_ns = info
             .fields
-            .get("media-engine-decoder")
+            .get("media-engine-usage")
             .unwrap_or(&"0 ns".to_string())
             .trim_end_matches(" ns")
             .parse::<u64>()
@@ -369,7 +369,7 @@ impl StreamTableRenderer {
                         let freq = info
                             .v4l2_info
                             .fields
-                            .get("media-curfreq-decoder")
+                            .get("media-curfreq")
                             .unwrap_or(&"unknown".to_string())
                             .to_string()
                             .trim_end_matches(" Hz")
