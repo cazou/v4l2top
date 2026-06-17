@@ -693,7 +693,13 @@ impl TopRenderer {
             }
         };
 
-        let mem_list = v4l2_mem_get_usage()?;
+        let mem_list = match v4l2_mem_get_usage() {
+            Ok(mem) => mem,
+            Err(e) => {
+                error!("Error fetching V4L2 memory usage: {e}");
+                HashMap::new()
+            }
+        };
 
         // Remove entries for closed FDs and update usage for active ones.
         let to_remove = self
