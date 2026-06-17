@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::{BTreeMap, HashMap, VecDeque},
     time::Instant,
 };
 
@@ -103,7 +103,7 @@ impl UsageRendererType {
 struct StreamBarRenderer {
     assignments: [(Option<V4L2Stream>, u8); NUM_BARS],
     slots: [Option<V4L2Stream>; NUM_BARS],
-    usage: u8,
+    usage: BTreeMap<String, usize>,
     selected: Option<V4L2Stream>,
 }
 
@@ -112,14 +112,14 @@ impl StreamBarRenderer {
         Self {
             assignments: [(None, 0u8); NUM_BARS],
             slots: [None; NUM_BARS],
-            usage: 0,
+            usage: BTreeMap::new(),
             selected: None,
         }
     }
 
     #[allow(dead_code)]
-    fn total_usage(&self) -> u8 {
-        self.usage.max(100)
+    fn total_usage(&self) -> usize {
+        self.usage.values().sum()
     }
 
     /// Update assignments given current mem_map. Returns ordered (slot_index, pid, usage) for
@@ -136,9 +136,18 @@ impl StreamBarRenderer {
             }
         }
 
-        self.usage = info
-            .iter()
-            .fold(0, |acc, (_, m)| acc + m.usage.current_usage.unwrap_or(0));
+        // Compute per-driver usage totals for the summary bars.
+        self.usage = BTreeMap::new();
+        for (_, stream_info) in info {
+            let driver = match stream_info.v4l2_info.fields.get("media-driver") {
+                Some(d) => d,
+                None => {
+                    continue;
+                }
+            };
+            let entry = self.usage.entry(driver.clone()).or_insert(0);
+            *entry += stream_info.usage.current_usage.unwrap_or(0) as usize;
+        }
 
         // Sort Streams by usage descending; keep only top NUM_BARS.
         let mut ranked: Vec<(V4L2Stream, u8)> = info
@@ -240,19 +249,30 @@ impl StreamBarRenderer {
             }
         }
 
-        let color = match self.usage {
-            0..=50 => Color::Green,
-            51..=80 => Color::Yellow,
-            _ => Color::Red,
-        };
-        frame.render_widget(
-            LineGauge::default()
-                .label(format!("Total usage: {:>3}%", self.usage))
-                .ratio(self.usage as f64 / 100.0)
-                .filled_symbol("|")
-                .filled_style(Style::default().fg(color)),
-            rows_layout[BAR_ROWS],
-        );
+        let total_usages_constraints: Vec<Constraint> =
+            (0..self.usage.len()).map(|_| Constraint::Percentage(100 / self.usage.len() as u16)).collect();
+        let total_usages_layout = Layout::default()
+                .spacing(2)
+                .direction(Direction::Horizontal)
+                .constraints(total_usages_constraints)
+                .split(rows_layout[BAR_ROWS]);
+
+        for (layout, (driver, usage)) in self.usage.iter().enumerate() {
+            let color = match usage {
+                0..=50 => Color::Green,
+                51..=80 => Color::Yellow,
+                _ => Color::Red,
+            };
+
+            frame.render_widget(
+                LineGauge::default()
+                    .label(format!("{driver}: {usage:>3}%"))
+                    .ratio(*usage as f64 / 100.0)
+                    .filled_symbol("|")
+                    .filled_style(Style::default().fg(color)),
+                total_usages_layout[layout],
+            );
+        }
     }
 }
 
