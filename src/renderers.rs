@@ -30,7 +30,7 @@ const BAR_ROWS: usize = NUM_BARS / BAR_COLS;
 /// Compact byte formatting
 pub fn format_bytes(bytes: u64, show_bytes: bool) -> String {
     if show_bytes {
-        return format!("{} B", bytes);
+        return format!("{}B", bytes);
     }
 
     const KB: f64 = 1024.0;
@@ -48,6 +48,29 @@ pub fn format_bytes(bytes: u64, show_bytes: bool) -> String {
         format!("{b}B")
     }
 }
+
+/// Compact frequency formatting
+pub fn format_freq(freq: u64, show_hertz: bool) -> String {
+    if show_hertz {
+        return format!("{}Hz", freq);
+    }
+
+    const KHZ: f64 = 1024.0;
+    const MHZ: f64 = KHZ * 1024.0;
+    const GHZ: f64 = MHZ * 1024.0;
+
+    let f = freq as f64;
+    if f >= GHZ {
+        format!("{:.1}GHz", f / GHZ)
+    } else if f >= MHZ {
+        format!("{:.1}MHz", f / MHZ)
+    } else if f >= KHZ {
+        format!("{:.0}KHz", f / KHZ)
+    } else {
+        format!("{f}Hz")
+    }
+}
+
 
 /// Follows the hw usage of a given FD.
 #[derive(Debug, Clone)]
@@ -342,13 +365,15 @@ impl StreamTableRenderer {
                     ),
                     Cell::from(stream.pid.to_string()),
                     Cell::from(stream.fd.to_string()),
-                    Cell::from(
-                        info.v4l2_info
+                    Cell::from({
+                        let freq = info.v4l2_info
                             .fields
                             .get("media-curfreq-decoder")
                             .unwrap_or(&"unknown".to_string())
-                            .to_string(),
-                    ),
+                            .to_string().trim_end_matches(" Hz")
+                            .parse::<u64>().unwrap_or(0);
+                        format_freq(freq, self.show_bytes)
+                    }),
                     Cell::from({
                         let total_mem = info.mem_usage.iter().fold(0, |mem, e| mem + e.size);
                         format_bytes(total_mem as u64, self.show_bytes)
@@ -786,7 +811,7 @@ impl TopRenderer {
             "F2".bold(),
             "UsageType".black().on_light_green(),
             "F3".bold(),
-            "Pretty/Byte".black().on_light_green(),
+            "Compact/Unit".black().on_light_green(),
             "F4".bold(),
             "FullCmd".black().on_light_green(),
             "q".bold(),
