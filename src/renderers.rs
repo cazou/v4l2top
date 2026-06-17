@@ -71,7 +71,6 @@ pub fn format_freq(freq: u64, show_hertz: bool) -> String {
     }
 }
 
-
 /// Follows the hw usage of a given FD.
 #[derive(Debug, Clone)]
 struct CodecUsage {
@@ -168,7 +167,7 @@ impl StreamBarRenderer {
 
         // Compute per-driver usage totals for the summary bars.
         self.usage = BTreeMap::new();
-        for (_, stream_info) in info {
+        for stream_info in info.values() {
             let driver = match stream_info.v4l2_info.fields.get("media-driver") {
                 Some(d) => d,
                 None => {
@@ -184,7 +183,7 @@ impl StreamBarRenderer {
             .iter()
             .filter_map(|(&p, b)| b.usage.current_usage.map(|pct| (p, pct)))
             .collect();
-        ranked.sort_by(|a, b| b.1.cmp(&a.1));
+        ranked.sort_by_key(|a| std::cmp::Reverse(a.1));
         ranked.truncate(NUM_BARS);
         let top_pids: HashMap<V4L2Stream, u8> = ranked.iter().copied().collect();
 
@@ -279,13 +278,14 @@ impl StreamBarRenderer {
             }
         }
 
-        let total_usages_constraints: Vec<Constraint> =
-            (0..self.usage.len()).map(|_| Constraint::Percentage(100 / self.usage.len() as u16)).collect();
+        let total_usages_constraints: Vec<Constraint> = (0..self.usage.len())
+            .map(|_| Constraint::Percentage(100 / self.usage.len() as u16))
+            .collect();
         let total_usages_layout = Layout::default()
-                .spacing(2)
-                .direction(Direction::Horizontal)
-                .constraints(total_usages_constraints)
-                .split(rows_layout[BAR_ROWS]);
+            .spacing(2)
+            .direction(Direction::Horizontal)
+            .constraints(total_usages_constraints)
+            .split(rows_layout[BAR_ROWS]);
 
         for (layout, (driver, usage)) in self.usage.iter().enumerate() {
             let color = match usage {
@@ -366,12 +366,15 @@ impl StreamTableRenderer {
                     Cell::from(stream.pid.to_string()),
                     Cell::from(stream.fd.to_string()),
                     Cell::from({
-                        let freq = info.v4l2_info
+                        let freq = info
+                            .v4l2_info
                             .fields
                             .get("media-curfreq-decoder")
                             .unwrap_or(&"unknown".to_string())
-                            .to_string().trim_end_matches(" Hz")
-                            .parse::<u64>().unwrap_or(0);
+                            .to_string()
+                            .trim_end_matches(" Hz")
+                            .parse::<u64>()
+                            .unwrap_or(0);
                         format_freq(freq, self.show_bytes)
                     }),
                     Cell::from({
@@ -485,6 +488,8 @@ struct Snapshot {
     per_stream: HashMap<V4L2Stream, u8>,
 }
 
+type ChartData = Vec<(V4L2Stream, Color, Vec<(f64, f64)>)>;
+
 /// Rolling time-series history of per-process codec memory usage.
 ///
 /// Records one snapshot per tick and builds cumulative (stacked) datasets
@@ -500,7 +505,7 @@ struct UsageHistoryRenderer {
     next_color: usize,
     /// Pre-computed chart data, rebuilt on every `record()`.
     /// Each entry: (pid, color, cumulative points).
-    chart_data: Vec<(V4L2Stream, Color, Vec<(f64, f64)>)>,
+    chart_data: ChartData,
     x_min: f64,
     x_max: f64,
 }
